@@ -317,14 +317,45 @@ function parseFrontmatter(content: string) {
 
   const lines = match[1].split(/\r?\n/);
   let inTags = false;
+  let blockKey: "summary" | "description" | "" = "";
+  let blockLines: string[] = [];
+
+  const flushBlock = () => {
+    if (!blockKey) return;
+    const value = blockLines
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+    if (blockKey === "summary") out.summary = value;
+    if (blockKey === "description") out.description = value;
+    blockKey = "";
+    blockLines = [];
+  };
+
   for (const line of lines) {
+    if (blockKey) {
+      if (/^\s+/.test(line) || !line.trim()) {
+        blockLines.push(line);
+        continue;
+      }
+      flushBlock();
+    }
+
     const pair = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
     if (pair) {
-      inTags = pair[1] === "tags";
-      if (pair[1] === "name") out.name = cleanYaml(pair[2]);
-      if (pair[1] === "summary") out.summary = cleanYaml(pair[2]);
-      if (pair[1] === "description") out.description = cleanYaml(pair[2]);
-      if (pair[1] === "tags" && pair[2].startsWith("[")) out.tags = pair[2].replace(/[[\]]/g, "").split(",").map(cleanYaml).filter(Boolean);
+      const key = pair[1];
+      const rawValue = pair[2].trim();
+      inTags = key === "tags";
+      if ((key === "summary" || key === "description") && /^[>|][+-]?$/.test(rawValue)) {
+        blockKey = key;
+        blockLines = [];
+        continue;
+      }
+      if (key === "name") out.name = cleanYaml(pair[2]);
+      if (key === "summary") out.summary = cleanYaml(pair[2]);
+      if (key === "description") out.description = cleanYaml(pair[2]);
+      if (key === "tags" && pair[2].startsWith("[")) out.tags = pair[2].replace(/[[\]]/g, "").split(",").map(cleanYaml).filter(Boolean);
       continue;
     }
     if (inTags) {
@@ -332,6 +363,7 @@ function parseFrontmatter(content: string) {
       if (item) out.tags.push(cleanYaml(item[1]));
     }
   }
+  flushBlock();
 
   return out;
 }
