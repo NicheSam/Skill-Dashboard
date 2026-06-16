@@ -5,9 +5,9 @@
     "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: geometricPrecision;
-  --bg: #eef2f7;
-  --shell: #0d1624;
-  --shell-2: #121f31;
+  --bg: #f4f6f9;
+  --shell: #101827;
+  --shell-2: #172033;
   --panel: #ffffff;
   --panel-soft: #f7f9fc;
   --panel-tint: #eef5ff;
@@ -25,7 +25,7 @@
   --yellow-soft: #fff4d5;
   --red: #b42318;
   --red-soft: #ffe4e0;
-  --shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
+  --shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
   --radius: 8px;
 }
 
@@ -54,7 +54,7 @@ button {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 248px minmax(0, 1fr);
+  grid-template-columns: 216px minmax(0, 1fr);
   min-height: 100vh;
   max-width: 100vw;
   overflow-x: hidden;
@@ -64,11 +64,11 @@ button {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 22px;
+  gap: 16px;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   background: linear-gradient(180deg, var(--shell), #09111d);
   color: #f8fafc;
-  padding: 20px 14px;
+  padding: 14px 12px;
 }
 
 .brand {
@@ -80,8 +80,8 @@ button {
 
 .brand-mark {
   display: grid;
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
   place-items: center;
   border: 1px solid rgba(147, 197, 253, 0.28);
   border-radius: var(--radius);
@@ -124,12 +124,12 @@ button {
   align-items: center;
   gap: 10px;
   width: 100%;
-  min-height: 40px;
+  min-height: 36px;
   border: 1px solid transparent;
   border-radius: var(--radius);
   background: transparent;
   color: #b8c5d8;
-  padding: 9px 10px;
+  padding: 8px 9px;
   text-align: left;
   transition:
     background 160ms ease,
@@ -185,15 +185,15 @@ button {
 .workspace {
   min-width: 0;
   overflow-x: hidden;
-  padding: 24px;
+  padding: 18px;
 }
 
 .topbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(360px, 520px);
-  gap: 20px;
-  align-items: start;
-  margin-bottom: 18px;
+  grid-template-columns: minmax(190px, 0.72fr) minmax(360px, 1fr);
+  gap: 14px;
+  align-items: end;
+  margin-bottom: 12px;
 }
 
 .section-kicker {
@@ -204,9 +204,9 @@ button {
 
 .topbar h1 {
   max-width: 760px;
-  margin: 5px 0 8px;
-  font-size: clamp(26px, 3.2vw, 38px);
-  line-height: 1.16;
+  margin: 3px 0 0;
+  font-size: clamp(20px, 2.2vw, 28px);
+  line-height: 1.12;
   letter-spacing: 0;
   overflow-wrap: anywhere;
 }
@@ -214,7 +214,7 @@ button {
 .topbar p {
   max-width: 680px;
   color: var(--muted);
-  font-size: 15px;
+  font-size: 13px;
   line-height: 1.55;
 }
 
@@ -238,14 +238,14 @@ button {
 .metric-strip div {
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.78);
-  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 8px 10px;
 }
 
 .metric-strip span {
   display: block;
   color: var(--text);
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 780;
 }
 
@@ -263,7 +263,7 @@ button {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--panel);
-  padding: 10px 12px;
+  padding: 8px 10px;
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
 }
 
@@ -292,12 +292,12 @@ button {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--panel);
-  box-shadow: var(--shadow);
+  box-shadow: none;
 }
 
 .list-panel {
   min-height: 620px;
-  padding: 12px;
+  padding: 10px;
 }
 
 .list-header {
@@ -346,7 +346,7 @@ button {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: #ffffff;
-  padding: 10px;
+  padding: 8px;
 }
 
 .tag-filter-head {
@@ -383,7 +383,7 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 9px;
+  padding: 5px 8px;
 }
 
 .tag-filter-list button span {
@@ -401,22 +401,22 @@ button {
 .capability-list,
 .profile-list {
   display: grid;
-  gap: 6px;
+  gap: 4px;
   padding-top: 10px;
 }
 
 .capability-row,
 .profile-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
   width: 100%;
   min-width: 0;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 7px;
   background: #ffffff;
   color: var(--text);
-  padding: 8px 10px;
+  padding: 6px 8px;
   text-align: left;
   transition:
     background 160ms ease,
@@ -444,21 +444,21 @@ button {
 
 .capability-row.selected {
   border-color: #7aa7f8;
-  background: var(--panel-tint);
+  background: #f4f8ff;
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .expanded-detail {
   display: grid;
   grid-column: 1 / -1;
-  gap: 14px;
+  gap: 10px;
   border-top: 1px solid var(--border);
-  padding-top: 14px;
+  padding-top: 10px;
 }
 
 .row-main {
   display: grid;
-  grid-template-columns: minmax(180px, 0.36fr) minmax(0, 1fr);
+  grid-template-columns: minmax(180px, 0.34fr) minmax(0, 1fr);
   align-items: center;
   gap: 10px;
   min-width: 0;
@@ -482,6 +482,14 @@ button {
 .row-title strong {
   font-size: 14px;
   line-height: 1.25;
+}
+
+.row-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  min-width: 112px;
 }
 
 .star-badge {
@@ -567,7 +575,7 @@ button {
   border: 1px solid var(--border);
   background: var(--panel-soft);
   color: var(--muted);
-  padding: 4px 6px;
+  padding: 3px 6px;
 }
 
 .status-badge {
@@ -583,8 +591,8 @@ button {
 
 .icon-action {
   display: inline-flex;
-  width: 38px;
-  height: 38px;
+  width: 32px;
+  height: 32px;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
@@ -631,28 +639,28 @@ button {
 
 .detail-heading {
   display: grid;
-  gap: 9px;
+  gap: 7px;
   border-bottom: 1px solid var(--border);
-  padding-bottom: 14px;
+  padding-bottom: 10px;
 }
 
 .detail-heading h2 {
   margin: 0;
-  font-size: 22px;
+  font-size: 19px;
   line-height: 1.18;
 }
 
 .detail-heading p {
   margin: 0;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.55;
 }
 
 .detail-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
   margin: 0;
 }
 
@@ -660,15 +668,16 @@ button {
   display: grid;
   gap: 6px;
   min-width: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--panel-soft);
-  padding: 10px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  padding: 8px 0 0;
 }
 
 .detail-list div:nth-child(2),
 .detail-list div:nth-child(3) {
-  grid-column: 1 / -1;
+  grid-column: span 2;
 }
 
 .detail-list dt,
@@ -689,8 +698,8 @@ button {
   gap: 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--panel-soft);
-  padding: 10px;
+  background: #ffffff;
+  padding: 9px;
 }
 
 .scenario-section h3 {
@@ -725,7 +734,7 @@ button {
 
 .risk-section {
   display: grid;
-  gap: 9px;
+  gap: 7px;
 }
 
 .risk-section h3 {
@@ -744,7 +753,7 @@ button {
   gap: 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 10px;
+  padding: 8px;
 }
 
 .risk-medium {
@@ -794,10 +803,10 @@ button {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 40px;
+  min-height: 34px;
   border-radius: var(--radius);
-  padding: 10px 12px;
-  font-size: 13px;
+  padding: 8px 11px;
+  font-size: 12px;
   font-weight: 760;
   transition:
     background 160ms ease,
@@ -882,21 +891,21 @@ button {
 
 .diagnostic-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .diagnostic-card {
   display: grid;
-  gap: 8px;
+  gap: 5px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--panel-soft);
-  padding: 16px;
+  padding: 10px;
 }
 
 .diagnostic-card span {
-  font-size: 28px;
+  font-size: 20px;
   font-weight: 780;
 }
 
@@ -907,12 +916,12 @@ button {
 
 .overview-panel {
   display: grid;
-  gap: 14px;
+  gap: 10px;
 }
 
 .overview-heading {
   border-bottom: 1px solid var(--border);
-  padding: 2px 4px 14px;
+  padding: 2px 4px 10px;
 }
 
 .overview-heading h2 {
@@ -934,29 +943,38 @@ button {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--panel-soft);
-  padding: 12px;
+  padding: 10px;
 }
 
 .scan-section h3 {
   margin: 0;
   color: var(--faint);
   font-size: 12px;
+  font-weight: 760;
 }
 
 .api-settings-section {
-  gap: 12px;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
-.api-settings-head {
+.api-summary-button {
   display: flex;
-  align-items: start;
+  width: 100%;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 10px;
+  text-align: left;
 }
 
-.api-settings-head div {
+.api-summary-button div {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .api-status {
@@ -978,9 +996,16 @@ button {
 
 .api-settings-grid {
   display: grid;
-  grid-template-columns: minmax(120px, 0.75fr) minmax(220px, 1.15fr) minmax(360px, 1.6fr) minmax(104px, auto);
+  grid-template-columns: minmax(120px, 0.7fr) minmax(210px, 1fr) minmax(280px, 1.3fr) minmax(120px, auto);
   gap: 8px;
   align-items: end;
+}
+
+.api-settings-body {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--border);
+  padding: 10px;
 }
 
 .api-settings-grid label {
@@ -1010,7 +1035,7 @@ button {
   border-radius: var(--radius);
   background: #ffffff;
   color: var(--text);
-  padding: 9px 10px;
+  padding: 8px 9px;
   outline: 0;
 }
 
@@ -1034,7 +1059,7 @@ button {
 
 .key-pill {
   display: inline-flex;
-  min-height: 40px;
+  min-height: 34px;
   align-items: center;
   justify-content: center;
   min-width: 0;
@@ -1042,15 +1067,15 @@ button {
   border-radius: var(--radius);
   background: #ffffff;
   color: var(--muted);
-  padding: 9px 10px;
+  padding: 8px 9px;
   font-size: 12px;
   font-weight: 760;
   white-space: nowrap;
 }
 
 .secondary-action.compact {
-  min-height: 40px;
-  padding: 8px 10px;
+  min-height: 34px;
+  padding: 7px 9px;
   font-size: 12px;
   white-space: nowrap;
 }
@@ -1077,7 +1102,7 @@ button {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: #ffffff;
-  padding: 10px;
+  padding: 8px;
 }
 
 .translation-estimate-grid span {
@@ -1088,7 +1113,7 @@ button {
 
 .translation-estimate-grid strong {
   color: var(--text);
-  font-size: 16px;
+  font-size: 14px;
   overflow-wrap: anywhere;
 }
 
@@ -1146,6 +1171,10 @@ button {
 
   .api-key-field {
     grid-column: 1 / -1;
+  }
+
+  .diagnostic-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
 }
@@ -1258,6 +1287,11 @@ button {
     gap: 7px;
   }
 
+  .row-actions {
+    justify-content: flex-start;
+    min-width: 0;
+  }
+
   .row-title strong {
     display: block;
     word-break: break-word;
@@ -1278,6 +1312,15 @@ button {
 
   .api-settings-head {
     display: grid;
+  }
+
+  .api-summary-button {
+    display: grid;
+  }
+
+  .detail-list div:nth-child(2),
+  .detail-list div:nth-child(3) {
+    grid-column: auto;
   }
 
   .toolbar-actions {

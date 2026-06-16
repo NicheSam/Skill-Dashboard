@@ -176,6 +176,7 @@ export function App() {
   const [translationSettings, setTranslationSettings] = useState<TranslationSettingsResponse | null>(null);
   const [translationForm, setTranslationForm] = useState<TranslationForm>({ provider: "gemini", model: "gemini-3.1-flash-lite-preview", apiKey: "" });
   const [apiKeyMode, setApiKeyMode] = useState<"closed" | "editing">("closed");
+  const [apiPanelOpen, setApiPanelOpen] = useState(false);
   const [settingsState, setSettingsState] = useState("");
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -511,7 +512,6 @@ export function App() {
           <div>
             <p className="section-kicker">{t.kicker}</p>
             <h1>{t.title}</h1>
-            <p>{t.subtitle}</p>
           </div>
           <div className="topbar-tools">
             <div className="toolbar-actions">
@@ -556,6 +556,8 @@ export function App() {
                 onApiKeyModeChange={setApiKeyMode}
                 onRemoveTranslationKey={() => void removeTranslationKey()}
                 onSaveTranslationSettings={() => void saveTranslationSettings()}
+                apiPanelOpen={apiPanelOpen}
+                onApiPanelOpenChange={setApiPanelOpen}
                 scan={inventory?.scan}
                 settingsState={settingsState}
                 stats={stats}
@@ -608,6 +610,23 @@ export function App() {
                             </div>
                           </div>
                         </button>
+                        <div className="row-actions">
+                          <button className="icon-action copy-action" onClick={() => void copyInvocation(capability)} title={copyLabels[locale]} type="button">
+                            <Copy size={15} aria-hidden="true" />
+                          </button>
+                          <button className="icon-action" onClick={() => void openLocalFolder(capability)} title={t.openFolder} type="button">
+                            <FolderOpen size={15} aria-hidden="true" />
+                          </button>
+                          {repoUrl ? (
+                            <a className="icon-action" href={repoUrl} rel="noreferrer" target="_blank" title={t.githubPage}>
+                              <Github size={15} aria-hidden="true" />
+                            </a>
+                          ) : (
+                            <button className="icon-action" disabled title={t.githubUnavailable} type="button">
+                              <Github size={15} aria-hidden="true" />
+                            </button>
+                          )}
+                        </div>
                         {isExpanded ? (
                           <CapabilityDetail
                             capability={capability}
@@ -763,7 +782,9 @@ function CapabilityDetail({
 function DashboardOverview({
   locale,
   apiKeyMode,
+  apiPanelOpen,
   onApiKeyModeChange,
+  onApiPanelOpenChange,
   onRemoveTranslationKey,
   onSaveTranslationSettings,
   onTranslationFormChange,
@@ -776,7 +797,9 @@ function DashboardOverview({
 }: {
   locale: Locale;
   apiKeyMode: "closed" | "editing";
+  apiPanelOpen: boolean;
   onApiKeyModeChange: (mode: "closed" | "editing") => void;
+  onApiPanelOpenChange: (open: boolean) => void;
   onRemoveTranslationKey: () => void;
   onSaveTranslationSettings: () => void;
   onTranslationFormChange: (form: TranslationForm) => void;
@@ -825,103 +848,101 @@ function DashboardOverview({
         <h3>{t.scannedAt}</h3>
         <p>{scan?.scannedAt ? formatDate(scan.scannedAt, locale) : "-"}</p>
       </section>
-      <section className="scan-section api-settings-section">
-        <div className="api-settings-head">
+      <section className={`scan-section api-settings-section ${apiPanelOpen ? "open" : ""}`}>
+        <button className="api-summary-button" onClick={() => onApiPanelOpenChange(!apiPanelOpen)} type="button">
           <div>
             <h3>{zh ? "\u7ffb\u8b6f API \u63a5\u53e3" : "Translation API"}</h3>
             <p>
-              {zh
-                ? "\u8a2d\u5b9a Gemini API key \u5f8c\uff0c\u6309\u4e0b\u91cd\u65b0\u6383\u63cf\u6703\u5c07\u65b0\u589e\u6216\u8b8a\u66f4\u7684 skill \u63cf\u8ff0\u7ffb\u8b6f\u6210\u7e41\u9ad4\u4e2d\u6587\u4e26\u5feb\u53d6\u3002"
-                : "Set a Gemini API key, then rescan to translate new or changed skill descriptions into Traditional Chinese and cache them."}
+              {translationEstimate.pendingCount} / {translationEstimate.skillCount} {zh ? "\u5f85\u7ffb\u8b6f" : "pending"} ·{" "}
+              {translationEstimate.estimatedCostUsd === null ? "-" : `$${translationEstimate.estimatedCostUsd.toFixed(4)}`}
             </p>
           </div>
           <span className={`api-status ${translationSettings?.apiKeyConfigured ? "ready" : ""}`}>{keyStatus}</span>
-        </div>
-        <div className="api-settings-grid">
-          <label>
-            <span>{zh ? "\u63d0\u4f9b\u8005" : "Provider"}</span>
-            <select
-              value={translationForm.provider}
-              onChange={(event) =>
-                onTranslationFormChange({
-                  ...translationForm,
-                  provider: event.target.value as TranslationProvider,
-                  model: event.target.value === "openai" ? "gpt-4.1-mini" : event.target.value === "gemini" ? "gemini-3.1-flash-lite-preview" : ""
-                })
-              }
-            >
-              <option value="gemini">Gemini</option>
-              <option value="openai">OpenAI</option>
-              <option value="none">{zh ? "\u4e0d\u555f\u7528" : "Disabled"}</option>
-            </select>
-          </label>
-          <label>
-            <span>{zh ? "\u6a21\u578b" : "Model"}</span>
-            <input
-              value={translationForm.model}
-              onChange={(event) => onTranslationFormChange({ ...translationForm, model: event.target.value })}
-              placeholder={translationForm.provider === "gemini" ? "gemini-3.1-flash-lite-preview" : "gpt-4.1-mini"}
-            />
-          </label>
-          <div className="api-key-field">
-            <span>{zh ? "API key" : "API key"}</span>
-            {translationSettings?.apiKeyConfigured && apiKeyMode === "closed" ? (
-              <div className="api-key-actions">
-                <span className="key-pill">{zh ? "\u5df2\u5132\u5b58" : "Saved"}</span>
-                <button className="secondary-action compact" onClick={() => onApiKeyModeChange("editing")} type="button">
-                  {zh ? "\u8b8a\u66f4 key" : "Change key"}
-                </button>
-                <button className="secondary-action compact danger" onClick={onRemoveTranslationKey} type="button">
-                  {zh ? "\u79fb\u9664 key" : "Remove key"}
-                </button>
+        </button>
+        {apiPanelOpen ? (
+          <div className="api-settings-body">
+            <div className="api-settings-grid">
+              <label>
+                <span>{zh ? "\u63d0\u4f9b\u8005" : "Provider"}</span>
+                <select
+                  value={translationForm.provider}
+                  onChange={(event) =>
+                    onTranslationFormChange({
+                      ...translationForm,
+                      provider: event.target.value as TranslationProvider,
+                      model: event.target.value === "openai" ? "gpt-4.1-mini" : event.target.value === "gemini" ? "gemini-3.1-flash-lite-preview" : ""
+                    })
+                  }
+                >
+                  <option value="gemini">Gemini</option>
+                  <option value="openai">OpenAI</option>
+                  <option value="none">{zh ? "\u4e0d\u555f\u7528" : "Disabled"}</option>
+                </select>
+              </label>
+              <label>
+                <span>{zh ? "\u6a21\u578b" : "Model"}</span>
+                <input
+                  value={translationForm.model}
+                  onChange={(event) => onTranslationFormChange({ ...translationForm, model: event.target.value })}
+                  placeholder={translationForm.provider === "gemini" ? "gemini-3.1-flash-lite-preview" : "gpt-4.1-mini"}
+                />
+              </label>
+              <div className="api-key-field">
+                <span>{zh ? "API key" : "API key"}</span>
+                {translationSettings?.apiKeyConfigured && apiKeyMode === "closed" ? (
+                  <div className="api-key-actions">
+                    <span className="key-pill">{zh ? "\u5df2\u5132\u5b58" : "Saved"}</span>
+                    <button className="secondary-action compact" onClick={() => onApiKeyModeChange("editing")} type="button">
+                      {zh ? "\u8b8a\u66f4 key" : "Change key"}
+                    </button>
+                    <button className="secondary-action compact danger" onClick={onRemoveTranslationKey} type="button">
+                      {zh ? "\u79fb\u9664 key" : "Remove key"}
+                    </button>
+                  </div>
+                ) : (
+                  <input
+                    value={translationForm.apiKey}
+                    onChange={(event) => onTranslationFormChange({ ...translationForm, apiKey: event.target.value })}
+                    placeholder={translationSettings?.apiKeyConfigured ? (zh ? "\u8f38\u5165\u65b0 key \u4ee5\u53d6\u4ee3\u820a key" : "Enter a new key to replace the old one") : "AIza..."}
+                    type="password"
+                  />
+                )}
               </div>
-            ) : (
-              <input
-                value={translationForm.apiKey}
-                onChange={(event) => onTranslationFormChange({ ...translationForm, apiKey: event.target.value })}
-                placeholder={translationSettings?.apiKeyConfigured ? (zh ? "\u8f38\u5165\u65b0 key \u4ee5\u53d6\u4ee3\u820a key" : "Enter a new key to replace the old one") : "AIza..."}
-                type="password"
-              />
-            )}
+              <button className="primary-action" onClick={onSaveTranslationSettings} type="button">
+                {zh ? "\u5132\u5b58 API \u8a2d\u5b9a" : "Save API settings"}
+              </button>
+            </div>
+            <div className="translation-estimate-grid">
+              <div>
+                <span>{zh ? "\u76ee\u524d\u53ef\u57f7\u884c\u7ffb\u8b6f" : "Translation available now"}</span>
+                <strong>{translationEstimate.apiEnabled && translationEstimate.pendingCount > 0 ? (zh ? "\u53ef\u57f7\u884c" : "Ready") : zh ? "\u4e0d\u9700\u8981 / \u672a\u555f\u7528" : "Not needed / disabled"}</strong>
+              </div>
+              <div>
+                <span>{zh ? "\u5f85\u7ffb\u8b6f / skill" : "Pending / skills"}</span>
+                <strong>
+                  {translationEstimate.pendingCount} / {translationEstimate.skillCount}
+                </strong>
+              </div>
+              <div>
+                <span>{zh ? "\u9810\u4f30 token" : "Estimated tokens"}</span>
+                <strong>{(translationEstimate.estimatedInputTokens + translationEstimate.estimatedOutputTokens).toLocaleString()}</strong>
+              </div>
+              <div>
+                <span>{zh ? "\u9810\u4f30\u8cbb\u7528" : "Estimated cost"}</span>
+                <strong>{translationEstimate.estimatedCostUsd === null ? "-" : `$${translationEstimate.estimatedCostUsd.toFixed(4)}`}</strong>
+              </div>
+            </div>
+            <p>
+              {zh ? "\u76ee\u524d provider" : "Current provider"}: {providerLabel}
+              {translationSettings?.model ? ` / ${translationSettings.model}` : ""}
+            </p>
+            <p>
+              {zh ? "\u8f38\u5165" : "Input"} {translationEstimate.estimatedInputTokens.toLocaleString()} tokens / {zh ? "\u8f38\u51fa" : "Output"}{" "}
+              {translationEstimate.estimatedOutputTokens.toLocaleString()} tokens. {translationEstimate.rateNote}
+            </p>
+            {stateText ? <p className="settings-state">{stateText}</p> : null}
           </div>
-          <button className="primary-action" onClick={onSaveTranslationSettings} type="button">
-            {zh ? "\u5132\u5b58 API \u8a2d\u5b9a" : "Save API settings"}
-          </button>
-        </div>
-        <p>
-          {zh ? "\u76ee\u524d provider" : "Current provider"}: {providerLabel}
-          {translationSettings?.model ? ` / ${translationSettings.model}` : ""}
-        </p>
-        <div className="translation-estimate-grid">
-          <div>
-            <span>{zh ? "\u76ee\u524d\u53ef\u57f7\u884c\u7ffb\u8b6f" : "Translation available now"}</span>
-            <strong>{translationEstimate.apiEnabled && translationEstimate.pendingCount > 0 ? (zh ? "\u53ef\u57f7\u884c" : "Ready") : zh ? "\u4e0d\u9700\u8981 / \u672a\u555f\u7528" : "Not needed / disabled"}</strong>
-          </div>
-          <div>
-            <span>{zh ? "\u5f85\u7ffb\u8b6f / skill" : "Pending / skills"}</span>
-            <strong>
-              {translationEstimate.pendingCount} / {translationEstimate.skillCount}
-            </strong>
-          </div>
-          <div>
-            <span>{zh ? "\u9810\u4f30 token" : "Estimated tokens"}</span>
-            <strong>{(translationEstimate.estimatedInputTokens + translationEstimate.estimatedOutputTokens).toLocaleString()}</strong>
-          </div>
-          <div>
-            <span>{zh ? "\u9810\u4f30\u8cbb\u7528" : "Estimated cost"}</span>
-            <strong>{translationEstimate.estimatedCostUsd === null ? "-" : `$${translationEstimate.estimatedCostUsd.toFixed(4)}`}</strong>
-          </div>
-        </div>
-        <p>
-          {zh ? "\u8f38\u5165" : "Input"} {translationEstimate.estimatedInputTokens.toLocaleString()} tokens / {zh ? "\u8f38\u51fa" : "Output"}{" "}
-          {translationEstimate.estimatedOutputTokens.toLocaleString()} tokens. {translationEstimate.rateNote}
-        </p>
-        <p>
-          {zh
-            ? "\u9810\u4f30\u6703\u5728\u5132\u5b58 API \u8a2d\u5b9a\u5f8c\u7acb\u5373\u91cd\u7b97\u3002\u82e5\u5f8c\u7e8c\u6383\u63cf\u8b8a\u6162\uff0c\u901a\u5e38\u662f\u56e0\u70ba\u6709\u5f85\u7ffb\u8b6f\u7684 skill \u8981\u6279\u6b21\u547c\u53eb API\u3002\u5df2\u5feb\u53d6\u6216\u539f\u6587\u6c92\u8b8a\u7684\u9805\u76ee\u4e0d\u6703\u91cd\u8907\u7ffb\u8b6f\u3002"
-            : "If rescan is slow, it is usually because pending skills are being translated through batched API calls. Cached or unchanged items are not translated again."}
-        </p>
-        {stateText ? <p className="settings-state">{stateText}</p> : null}
+        ) : null}
       </section>
       <section className="scan-section">
         <h3>{t.scanRoots}</h3>
