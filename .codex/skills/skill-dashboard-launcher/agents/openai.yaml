@@ -1,0 +1,4 @@
+interface:
+  display_name: "Skill-Dashboard"
+  short_description: "Open the local Skill-Dashboard inside Codex Desktop."
+  default_prompt: "Open Skill-Dashboard."

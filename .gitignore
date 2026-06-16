@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.logs/
+output/
+data/
+!.gitkeep
+.env
+.env.*
+*.log
+*.tmp
+*.cache
