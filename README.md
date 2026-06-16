@@ -4,6 +4,54 @@ Skill-Dashboard is a local dashboard for browsing Codex skills and MCP servers w
 
 Skill-Dashboard 是一個本機管理台，用來瀏覽 Codex skills 與 MCP servers，不需要手動打開每個 `SKILL.md`。
 
+## Fastest Codex Workflow
+
+The intended low-friction workflow is to install the launcher skill once, then call Skill-Dashboard from Codex whenever you need it.
+
+```bash
+git clone https://github.com/NicheSam/Skill-Dashboard.git
+cd Skill-Dashboard
+npm install
+npm run install:skill
+```
+
+After Codex reloads its skills, call:
+
+```text
+$skill-dashboard-launcher
+```
+
+Expected behavior:
+
+1. Codex finds the local Skill-Dashboard project.
+2. Codex runs `npm run launch`.
+3. The launcher starts the local server when needed.
+4. Codex opens `http://localhost:8765` in the in-app browser or web preview panel.
+
+## 最快的 Codex 使用流程
+
+建議的無阻力流程是先安裝一次啟動器 skill，之後需要管理台時直接在 Codex 呼叫。
+
+```bash
+git clone https://github.com/NicheSam/Skill-Dashboard.git
+cd Skill-Dashboard
+npm install
+npm run install:skill
+```
+
+Codex 重新載入 skills 後，呼叫：
+
+```text
+$skill-dashboard-launcher
+```
+
+預期流程：
+
+1. Codex 找到本機 Skill-Dashboard 專案。
+2. Codex 執行 `npm run launch`。
+3. 啟動器在需要時啟動本機 server。
+4. Codex 在 in-app browser 或 web preview 面板打開 `http://localhost:8765`。
+
 ## What It Does
 
 - Scans local Codex skills, MCP config, and plugin cache metadata.
