@@ -3,6 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import { homedir } from "node:os";
 import { basename, dirname, join, normalize, parse as parsePath, relative, sep } from "node:path";
 import type { Capability, InventoryResponse, RiskBadge } from "../shared/schema";
+import { readGithubLinks, type GithubLinkMap } from "./github-links";
 import { parseMcpServerSections, parseSkillFrontmatter } from "./parsers";
 import { readTranslationSettings } from "./settings";
 
@@ -32,18 +33,19 @@ interface TranslationCacheEntry {
 export async function scanInventory(): Promise<InventoryResponse> {
   const errors: string[] = [];
   const capabilities: Capability[] = [];
+  const githubLinks = await readGithubLinks();
 
   for (const root of roots) {
     try {
       const skillFiles = await findFiles(root, "SKILL.md");
-      capabilities.push(...(await Promise.all(skillFiles.map((file) => skillCapability(file)))));
+      capabilities.push(...(await Promise.all(skillFiles.map((file) => skillCapability(file, githubLinks)))));
     } catch (error) {
       errors.push(`${root}: ${messageFrom(error)}`);
     }
   }
 
   try {
-    capabilities.push(...(await pluginCapabilities(pluginCacheRoot)));
+    capabilities.push(...(await pluginCapabilities(pluginCacheRoot, githubLinks)));
   } catch (error) {
     errors.push(`plugins: ${messageFrom(error)}`);
   }
@@ -101,7 +103,7 @@ async function findFiles(root: string, targetName: string): Promise<string[]> {
   return files;
 }
 
-async function skillCapability(file: string): Promise<Capability> {
+async function skillCapability(file: string, githubLinks: GithubLinkMap): Promise<Capability> {
   const content = await readHead(file);
   const frontmatter = parseSkillFrontmatter(content);
   const title = firstMarkdownTitle(content);
@@ -111,7 +113,8 @@ async function skillCapability(file: string): Promise<Capability> {
   const summary = frontmatter.summary || frontmatter.description || firstParagraph(content) || "No summary found.";
   const risks = risksFromText(content);
   const invocation = sourceInfo.pluginName ? `$${sourceInfo.pluginName}:${kebab(name)}` : `$${kebab(name)}`;
-  const githubUrl = await resolveGithubUrl(file, content);
+  const id = stableId("skill", file);
+  const github = await resolveGithubDetection(file, content, githubLinks[id]?.url);
   const tags = skillTags({
     name,
     summary,
@@ -120,7 +123,7 @@ async function skillCapability(file: string): Promise<Capability> {
   const zh = zhCapabilityNarrative("skill", name, summary, sourceInfo.pluginName || sourceInfo.rootLabel);
 
   return {
-    id: stableId("skill", file),
+    id,
     type: "skill",
     name,
     summary,
@@ -138,7 +141,9 @@ async function skillCapability(file: string): Promise<Capability> {
       root: sourceInfo.rootLabel,
       officialBuiltIn: isOfficialCodexSource(sourceInfo.rootLabel, file),
       officialSource: officialSourceLabel(sourceInfo.rootLabel, file),
-      githubUrl: githubUrl ?? "",
+      githubUrl: github.url,
+      githubSource: github.source,
+      githubCandidates: github.candidates,
       sourceTags: sourceTagsForSkill(sourceInfo.pluginName, sourceInfo.rootLabel),
       zhSummary: zh.summary,
       zhScenarios: zh.scenarios
@@ -146,7 +151,7 @@ async function skillCapability(file: string): Promise<Capability> {
   };
 }
 
-async function pluginCapabilities(root: string): Promise<Capability[]> {
+async function pluginCapabilities(root: string, githubLinks: GithubLinkMap): Promise<Capability[]> {
   const result: Capability[] = [];
   const cacheFamilies = await safeDirs(root);
 
@@ -160,12 +165,13 @@ async function pluginCapabilities(root: string): Promise<Capability[]> {
       for (const candidateRoot of candidateRoots) {
         const skillCount = (await findFiles(candidateRoot, "SKILL.md")).length;
         if (!skillCount) continue;
-        const githubUrl = await resolveGithubUrl(candidateRoot, "");
+        const id = stableId("plugin", candidateRoot);
+        const github = await resolveGithubDetection(candidateRoot, "", githubLinks[id]?.url);
         const tags = uniqueTags([pluginFunctionTag(pluginName), ...inferFunctionTags(`${prettyPluginName(pluginName)} ${family}`)]).slice(0, 6);
         const pluginSummary = `${skillCount} skills indexed from plugin cache.`;
         const zh = zhCapabilityNarrative("plugin", prettyPluginName(pluginName), pluginSummary, family);
         result.push({
-          id: stableId("plugin", candidateRoot),
+          id,
           type: "plugin",
           name: prettyPluginName(pluginName),
           summary: pluginSummary,
@@ -183,7 +189,9 @@ async function pluginCapabilities(root: string): Promise<Capability[]> {
             family,
             officialBuiltIn: isOfficialCodexSource(family, candidateRoot),
             officialSource: officialSourceLabel(family, candidateRoot),
-            githubUrl: githubUrl ?? "",
+            githubUrl: github.url,
+            githubSource: github.source,
+            githubCandidates: github.candidates,
             sourceTags: ["\u5916\u639b", family],
             zhSummary: zh.summary,
             zhScenarios: zh.scenarios
@@ -745,42 +753,121 @@ function uniqueTags(values: string[]) {
   return tags;
 }
 
-async function resolveGithubUrl(path: string, primaryContent: string) {
-  return (
-    extractGithubUrl(primaryContent) ??
-    (await githubUrlFromGitRemote(path)) ??
-    (await githubUrlFromNearbyReadme(path))
-  );
+interface GithubDetection {
+  url: string;
+  source: "manual" | "git-remote" | "package-json" | "skill" | "readme" | "none";
+  candidates: string[];
 }
 
-function extractGithubUrl(content: string) {
-  const urls = [
-    ...Array.from(content.matchAll(/https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\.git)?/g)).map((match) => match[0]),
+export async function resolveGithubDetection(path: string, primaryContent: string, manualUrl?: string): Promise<GithubDetection> {
+  const candidates = new Set<string>();
+  const manual = cleanGithubUrl(manualUrl ?? "");
+  if (manual && !isPlaceholderGithubUrl(manual)) {
+    candidates.add(manual);
+    return { url: manual, source: "manual", candidates: Array.from(candidates) };
+  }
+
+  const remote = await githubUrlFromGitRemote(path);
+  for (const url of remote.candidates) candidates.add(url);
+  if (remote.url) return { url: remote.url, source: "git-remote", candidates: Array.from(candidates) };
+
+  const packageJson = await githubUrlFromPackageJson(path);
+  for (const url of packageJson.candidates) candidates.add(url);
+  if (packageJson.url) return { url: packageJson.url, source: "package-json", candidates: Array.from(candidates) };
+
+  const skillUrls = extractGithubUrls(primaryContent);
+  for (const url of skillUrls) candidates.add(url);
+  if (skillUrls.length === 1) return { url: skillUrls[0], source: "skill", candidates: Array.from(candidates) };
+
+  const readme = await githubUrlFromNearbyReadme(path);
+  for (const url of readme.candidates) candidates.add(url);
+  if (readme.url) return { url: readme.url, source: "readme", candidates: Array.from(candidates) };
+
+  return { url: "", source: "none", candidates: Array.from(candidates) };
+}
+
+export function extractGithubUrls(content: string) {
+  const rawUrls = [
+    ...Array.from(content.matchAll(/(?:git\+)?https?:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\.git)?/g)).map((match) => match[0]),
     ...Array.from(content.matchAll(/git@github\.com:([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)(?:\.git)?/g)).map((match) => `https://github.com/${match[1]}`),
     ...Array.from(content.matchAll(/ssh:\/\/git@github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)(?:\.git)?/g)).map((match) => `https://github.com/${match[1]}`)
   ];
-  return urls.map(cleanGithubUrl).find((url) => url && !isPlaceholderGithubUrl(url));
+  return uniqueTags(rawUrls.map(cleanGithubUrl).filter((url) => url && !isPlaceholderGithubUrl(url)));
 }
 
 async function githubUrlFromGitRemote(path: string) {
   for (const dir of ancestorDirs(path)) {
     const config = await safeReadText(join(dir, ".git", "config"));
     if (!config) continue;
-    const url = extractGithubUrl(config);
-    if (url) return url;
+    const remotes = parseGitRemotes(config);
+    const candidates = remotes.map((remote) => remote.url);
+    return {
+      url: remotes.find((remote) => remote.name === "origin")?.url ?? remotes.find((remote) => remote.name === "upstream")?.url ?? remotes[0]?.url ?? "",
+      candidates
+    };
   }
-  return undefined;
+  return { url: "", candidates: [] };
+}
+
+function parseGitRemotes(config: string) {
+  const remotes: Array<{ name: string; url: string }> = [];
+  let current = "";
+  for (const line of config.split(/\r?\n/)) {
+    const section = line.match(/^\s*\[remote "([^"]+)"\]\s*$/);
+    if (section) {
+      current = section[1];
+      continue;
+    }
+    const url = line.match(/^\s*url\s*=\s*(.+?)\s*$/);
+    if (!current || !url) continue;
+    const cleaned = cleanGithubUrl(url[1]);
+    if (cleaned && !isPlaceholderGithubUrl(cleaned)) remotes.push({ name: current, url: cleaned });
+  }
+  return remotes;
+}
+
+async function githubUrlFromPackageJson(path: string) {
+  const candidates: string[] = [];
+  for (const dir of ancestorDirs(path)) {
+    const text = await safeReadText(join(dir, "package.json"), 20000);
+    if (!text) continue;
+    try {
+      const parsed = JSON.parse(text) as { repository?: unknown; homepage?: unknown };
+      const repositoryUrl = packageRepositoryUrl(parsed.repository);
+      if (repositoryUrl) candidates.push(repositoryUrl);
+      if (typeof parsed.homepage === "string") {
+        const homepageUrl = cleanGithubUrl(parsed.homepage);
+        if (homepageUrl && !isPlaceholderGithubUrl(homepageUrl)) candidates.push(homepageUrl);
+      }
+      const unique = uniqueTags(candidates);
+      return { url: unique[0] ?? "", candidates: unique };
+    } catch {
+      continue;
+    }
+  }
+  return { url: "", candidates: [] };
+}
+
+function packageRepositoryUrl(repository: unknown) {
+  if (typeof repository === "string") return cleanGithubUrl(repository);
+  if (repository && typeof repository === "object" && "url" in repository) {
+    const url = (repository as { url?: unknown }).url;
+    return typeof url === "string" ? cleanGithubUrl(url) : "";
+  }
+  return "";
 }
 
 async function githubUrlFromNearbyReadme(path: string) {
+  const candidates = new Set<string>();
   for (const dir of ancestorDirs(path)) {
     for (const name of ["README.md", "README.mdx", "README.txt"]) {
       const text = await safeReadText(join(dir, name), 20000);
-      const url = text ? extractGithubUrl(text) : undefined;
-      if (url) return url;
+      for (const url of extractGithubUrls(text)) candidates.add(url);
     }
+    if (candidates.size) break;
   }
-  return undefined;
+  const urls = Array.from(candidates);
+  return { url: urls.length === 1 ? urls[0] : "", candidates: urls };
 }
 
 function ancestorDirs(path: string) {
@@ -807,7 +894,14 @@ async function safeReadText(path: string, maxChars = 12000) {
 }
 
 function cleanGithubUrl(url: string) {
-  const match = url.match(/^https:\/\/github\.com\/([^/\s]+)\/([^/\s#?]+)/);
+  const normalized = url.trim().replace(/^git\+/, "").replace(/^github:/, "https://github.com/");
+  const ssh = normalized.match(/^git@github\.com:([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?:\.git)?$/);
+  if (ssh) return `https://github.com/${ssh[1]}/${ssh[2].replace(/\.git$/, "")}`;
+  const sshUrl = normalized.match(/^ssh:\/\/git@github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?:\.git)?$/);
+  if (sshUrl) return `https://github.com/${sshUrl[1]}/${sshUrl[2].replace(/\.git$/, "")}`;
+  const shortcut = normalized.match(/^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?:#.+)?$/);
+  if (shortcut) return `https://github.com/${shortcut[1]}/${shortcut[2].replace(/\.git$/, "")}`;
+  const match = normalized.match(/^https?:\/\/github\.com\/([^/\s]+)\/([^/\s#?]+)/);
   if (!match) return "";
   return `https://github.com/${match[1]}/${match[2].replace(/\.git$/, "")}`;
 }

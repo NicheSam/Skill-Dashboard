@@ -71,6 +71,15 @@ const text = {
     openFolder: "開啟本機資料夾",
     githubPage: "GitHub 專案頁",
     githubUnavailable: "未偵測到 GitHub 連結",
+    linkGithub: "\u9023\u7d50 GitHub",
+    changeGithub: "\u8b8a\u66f4 GitHub",
+    removeGithub: "\u79fb\u9664 GitHub",
+    githubUrlPlaceholder: "\u8cbc\u4e0a GitHub repo URL",
+    githubSource: "\u4f86\u6e90",
+    githubSaved: "\u5df2\u5132\u5b58 GitHub \u9023\u7d50\u3002",
+    githubRemoved: "\u5df2\u79fb\u9664 GitHub \u9023\u7d50\u3002",
+    githubInvalid: "GitHub URL \u683c\u5f0f\u4e0d\u6b63\u78ba\u3002",
+    githubCandidates: "\u53ef\u80fd\u7684 GitHub",
     openFailed: "無法開啟本機資料夾。",
     status: "狀態",
     invocation: "呼叫指令",
@@ -124,6 +133,15 @@ const text = {
     openFolder: "Open local folder",
     githubPage: "GitHub project",
     githubUnavailable: "No GitHub link detected",
+    linkGithub: "Link GitHub",
+    changeGithub: "Change GitHub",
+    removeGithub: "Remove GitHub",
+    githubUrlPlaceholder: "Paste GitHub repo URL",
+    githubSource: "Source",
+    githubSaved: "GitHub link saved.",
+    githubRemoved: "GitHub link removed.",
+    githubInvalid: "Invalid GitHub URL.",
+    githubCandidates: "Possible GitHub links",
     openFailed: "Unable to open local folder.",
     status: "Status",
     invocation: "Invocation",
@@ -173,6 +191,9 @@ export function App() {
   const [showOfficial, setShowOfficial] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [copyState, setCopyState] = useState<Record<string, string>>({});
+  const [githubEditId, setGithubEditId] = useState<string | null>(null);
+  const [githubInput, setGithubInput] = useState("");
+  const [githubState, setGithubState] = useState("");
   const [translationSettings, setTranslationSettings] = useState<TranslationSettingsResponse | null>(null);
   const [translationForm, setTranslationForm] = useState<TranslationForm>({ provider: "gemini", model: "gemini-3.1-flash-lite-preview", apiKey: "" });
   const [apiKeyMode, setApiKeyMode] = useState<"closed" | "editing">("closed");
@@ -383,6 +404,52 @@ export function App() {
     }
   }
 
+  function startGithubEdit(capability: Capability) {
+    setSelectedId(capability.id);
+    setGithubEditId(capability.id);
+    setGithubInput(githubUrl(capability));
+    setGithubState("");
+  }
+
+  async function saveGithubLink(capability: Capability, url: string) {
+    const cleaned = normalizeGithubInput(url);
+    if (!cleaned) {
+      setGithubState(t.githubInvalid);
+      return;
+    }
+    setGithubState("saving");
+    try {
+      const response = await fetch("/api/github-links", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ capabilityId: capability.id, url: cleaned })
+      });
+      if (!response.ok) throw new Error("github link failed");
+      await loadInventory();
+      setSelectedId(capability.id);
+      setGithubEditId(null);
+      setGithubInput("");
+      setGithubState(t.githubSaved);
+    } catch {
+      setGithubState(t.githubInvalid);
+    }
+  }
+
+  async function removeGithubLink(capability: Capability) {
+    setGithubState("saving");
+    try {
+      const response = await fetch(`/api/github-links/${encodeURIComponent(capability.id)}`, { method: "DELETE" });
+      if (!response.ok) throw new Error("github remove failed");
+      await loadInventory();
+      setSelectedId(capability.id);
+      setGithubEditId(null);
+      setGithubInput("");
+      setGithubState(t.githubRemoved);
+    } catch {
+      setGithubState(t.githubInvalid);
+    }
+  }
+
   function githubUrl(capability: Capability) {
     const value = capability.metadata?.githubUrl;
     return typeof value === "string" && value.startsWith("https://github.com/") ? value : "";
@@ -396,6 +463,16 @@ export function App() {
   function githubStarsLabel(capability: Capability) {
     const stars = githubStars(capability);
     return stars >= 0 ? stars.toLocaleString() : t.starsUnknown;
+  }
+
+  function githubCandidates(capability: Capability) {
+    const value = capability.metadata?.githubCandidates;
+    return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.startsWith("https://github.com/")) : [];
+  }
+
+  function githubSource(capability: Capability) {
+    const value = capability.metadata?.githubSource;
+    return typeof value === "string" && value !== "none" ? value : "";
   }
 
   function isOfficialCapability(capability: Capability) {
@@ -622,7 +699,7 @@ export function App() {
                               <Github size={15} aria-hidden="true" />
                             </a>
                           ) : (
-                            <button className="icon-action" disabled title={t.githubUnavailable} type="button">
+                            <button className="icon-action" onClick={() => startGithubEdit(capability)} title={t.linkGithub} type="button">
                               <Github size={15} aria-hidden="true" />
                             </button>
                           )}
@@ -633,9 +710,18 @@ export function App() {
                             copyLabel={copyState[capability.id] ?? copyLabels[locale]}
                             description={localizedSummary(capability, locale)}
                             scenarios={localizedScenarios(capability, locale)}
+                            githubCandidates={githubCandidates(capability)}
+                            githubEditId={githubEditId}
+                            githubInput={githubInput}
+                            githubSource={githubSource(capability)}
+                            githubState={githubState}
                             githubUrl={repoUrl}
                             locale={locale}
                             onCopy={() => void copyInvocation(capability)}
+                            onGithubInputChange={setGithubInput}
+                            onRemoveGithub={() => void removeGithubLink(capability)}
+                            onSaveGithub={(url) => void saveGithubLink(capability, url)}
+                            onStartGithubEdit={() => startGithubEdit(capability)}
                             onOpenFolder={() => void openLocalFolder(capability)}
                           />
                         ) : null}
@@ -693,22 +779,41 @@ function CapabilityDetail({
   capability,
   copyLabel,
   description,
+  githubCandidates,
+  githubEditId,
+  githubInput,
+  githubSource,
+  githubState,
   githubUrl,
   locale,
   onCopy,
+  onGithubInputChange,
+  onRemoveGithub,
+  onSaveGithub,
+  onStartGithubEdit,
   onOpenFolder,
   scenarios
 }: {
   capability: Capability;
   copyLabel: string;
   description: string;
+  githubCandidates: string[];
+  githubEditId: string | null;
+  githubInput: string;
+  githubSource: string;
+  githubState: string;
   githubUrl: string;
   locale: Locale;
   onCopy: () => void;
+  onGithubInputChange: (value: string) => void;
+  onRemoveGithub: () => void;
+  onSaveGithub: (url: string) => void;
+  onStartGithubEdit: () => void;
   onOpenFolder: () => void;
   scenarios: string[];
 }) {
   const t = text[locale];
+  const isEditingGithub = githubEditId === capability.id;
   return (
     <div className="expanded-detail">
       <div className="detail-heading">
@@ -748,6 +853,60 @@ function CapabilityDetail({
           <dd>{capability.tokenEstimate.toLocaleString()}</dd>
         </div>
       </dl>
+
+      <section className="github-link-section">
+        <div className="github-link-head">
+          <div>
+            <h3>GitHub</h3>
+            <p>
+              {githubUrl
+                ? `${t.githubPage}${githubSource ? ` · ${t.githubSource}: ${githubSource}` : ""}`
+                : t.githubUnavailable}
+            </p>
+          </div>
+          {githubUrl ? (
+            <a className="secondary-action compact" href={githubUrl} rel="noreferrer" target="_blank">
+              <Github size={15} aria-hidden="true" />
+              {t.githubPage}
+            </a>
+          ) : null}
+        </div>
+        {isEditingGithub || !githubUrl ? (
+          <div className="github-link-editor">
+            <input
+              onChange={(event) => onGithubInputChange(event.target.value)}
+              placeholder={t.githubUrlPlaceholder}
+              type="url"
+              value={githubInput}
+            />
+            <button className="secondary-action compact primary" disabled={githubState === "saving"} onClick={() => onSaveGithub(githubInput)} type="button">
+              {t.linkGithub}
+            </button>
+          </div>
+        ) : (
+          <div className="github-link-actions">
+            <button className="secondary-action compact" onClick={onStartGithubEdit} type="button">
+              {t.changeGithub}
+            </button>
+            {githubSource === "manual" ? (
+              <button className="secondary-action compact danger" onClick={onRemoveGithub} type="button">
+                {t.removeGithub}
+              </button>
+            ) : null}
+          </div>
+        )}
+        {githubCandidates.length && !githubUrl ? (
+          <div className="github-candidates">
+            <span>{t.githubCandidates}</span>
+            {githubCandidates.slice(0, 3).map((candidate) => (
+              <button key={candidate} onClick={() => onGithubInputChange(candidate)} type="button">
+                {candidate.replace("https://github.com/", "")}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {githubState && githubState !== "saving" ? <p className="form-note">{githubState}</p> : null}
+      </section>
 
       <section className="risk-section">
         <h3>{t.riskTitle}</h3>
@@ -1066,4 +1225,18 @@ function formatDate(value: string, locale: Locale) {
     dateStyle: "short",
     timeStyle: "medium"
   }).format(new Date(value));
+}
+
+function normalizeGithubInput(value: string) {
+  const normalized = value.trim().replace(/^git\+/, "").replace(/^github:/, "https://github.com/");
+  const ssh = normalized.match(/^git@github\.com:([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?:\.git)?$/);
+  if (ssh) return `https://github.com/${ssh[1]}/${ssh[2].replace(/\.git$/, "")}`;
+  const sshUrl = normalized.match(/^ssh:\/\/git@github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?:\.git)?$/);
+  if (sshUrl) return `https://github.com/${sshUrl[1]}/${sshUrl[2].replace(/\.git$/, "")}`;
+  const shortcut = normalized.match(/^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?:#.+)?$/);
+  if (shortcut) return `https://github.com/${shortcut[1]}/${shortcut[2].replace(/\.git$/, "")}`;
+  const match = normalized.match(/^https?:\/\/github\.com\/([^/\s]+)\/([^/\s#?]+)/);
+  if (!match) return "";
+  const slug = `${match[1]}/${match[2].replace(/\.git$/, "")}`;
+  return ["org/repo", "owner/repo", "user/repo", "octocat/hello-world"].includes(slug.toLowerCase()) ? "" : `https://github.com/${slug}`;
 }

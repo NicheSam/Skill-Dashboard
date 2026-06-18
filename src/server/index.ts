@@ -4,7 +4,17 @@ import { execFile } from "node:child_process";
 import { stat } from "node:fs/promises";
 import { platform } from "node:os";
 import { dirname } from "node:path";
-import type { InventoryResponse, OpenPathRequest, OpenPathResponse, TranslationSettingsResponse, TranslationSettingsUpdate } from "../shared/schema";
+import type {
+  GithubLinkCandidatesResponse,
+  GithubLinkResponse,
+  GithubLinkUpdate,
+  InventoryResponse,
+  OpenPathRequest,
+  OpenPathResponse,
+  TranslationSettingsResponse,
+  TranslationSettingsUpdate
+} from "../shared/schema";
+import { deleteGithubLink, setGithubLink } from "./github-links";
 import { scanInventory } from "./scanner";
 import { readTranslationSettings, sanitizeTranslationSettings, updateTranslationSettings } from "./settings";
 
@@ -39,6 +49,43 @@ app.post("/api/scan", async () => {
   return inventory;
 });
 
+app.get<{ Querystring: { capabilityId?: string }; Reply: GithubLinkCandidatesResponse }>("/api/github-link-candidates", async (request, reply) => {
+  const capabilityId = request.query.capabilityId ?? "";
+  const selected = inventory.capabilities.find((capability) => capability.id === capabilityId);
+  if (!selected) {
+    return reply.code(404).send({ capabilityId, candidates: [] });
+  }
+  const candidates = selected.metadata?.githubCandidates;
+  return {
+    capabilityId,
+    candidates: Array.isArray(candidates) ? candidates.filter((item): item is string => typeof item === "string") : []
+  };
+});
+
+app.post<{ Body: GithubLinkUpdate; Reply: GithubLinkResponse }>("/api/github-links", async (request, reply) => {
+  const capabilityId = request.body.capabilityId;
+  const url = cleanGithubUrl(request.body.url);
+  if (!inventory.capabilities.some((capability) => capability.id === capabilityId)) {
+    return reply.code(404).send({ ok: false, capabilityId, url: "" });
+  }
+  if (!url) {
+    return reply.code(400).send({ ok: false, capabilityId, url: "" });
+  }
+  await setGithubLink(capabilityId, url);
+  inventory = await scanInventory();
+  return { ok: true, capabilityId, url };
+});
+
+app.delete<{ Params: { capabilityId: string }; Reply: GithubLinkResponse }>("/api/github-links/:capabilityId", async (request, reply) => {
+  const capabilityId = request.params.capabilityId;
+  if (!inventory.capabilities.some((capability) => capability.id === capabilityId)) {
+    return reply.code(404).send({ ok: false, capabilityId, url: "" });
+  }
+  await deleteGithubLink(capabilityId);
+  inventory = await scanInventory();
+  return { ok: true, capabilityId, url: "" };
+});
+
 app.post<{ Body: OpenPathRequest; Reply: OpenPathResponse }>("/api/open-path", async (request, reply) => {
   const selected = inventory.capabilities.find((capability) => capability.id === request.body.capabilityId);
   if (!selected) {
@@ -70,6 +117,20 @@ function openFolder(path: string) {
     return;
   }
   execFile("xdg-open", [path]);
+}
+
+function cleanGithubUrl(value: string) {
+  const normalized = value.trim().replace(/^git\+/, "").replace(/^github:/, "https://github.com/");
+  const ssh = normalized.match(/^git@github\.com:([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?:\.git)?$/);
+  if (ssh) return `https://github.com/${ssh[1]}/${ssh[2].replace(/\.git$/, "")}`;
+  const sshUrl = normalized.match(/^ssh:\/\/git@github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?:\.git)?$/);
+  if (sshUrl) return `https://github.com/${sshUrl[1]}/${sshUrl[2].replace(/\.git$/, "")}`;
+  const shortcut = normalized.match(/^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?:#.+)?$/);
+  if (shortcut) return `https://github.com/${shortcut[1]}/${shortcut[2].replace(/\.git$/, "")}`;
+  const match = normalized.match(/^https?:\/\/github\.com\/([^/\s]+)\/([^/\s#?]+)/);
+  if (!match) return "";
+  const url = `https://github.com/${match[1]}/${match[2].replace(/\.git$/, "")}`;
+  return ["org/repo", "owner/repo", "user/repo", "octocat/hello-world"].includes(`${match[1]}/${match[2]}`.toLowerCase()) ? "" : url;
 }
 
 await app.listen({ host: "127.0.0.1", port });

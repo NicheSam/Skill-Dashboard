@@ -44,6 +44,22 @@ export interface OpenPathResponse {
   path: string;
 }
 
+export interface GithubLinkUpdate {
+  capabilityId: string;
+  url: string;
+}
+
+export interface GithubLinkResponse {
+  ok: boolean;
+  capabilityId: string;
+  url: string;
+}
+
+export interface GithubLinkCandidatesResponse {
+  capabilityId: string;
+  candidates: string[];
+}
+
 export type TranslationProvider = "none" | "openai" | "gemini";
 
 export interface TranslationSettings {

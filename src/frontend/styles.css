@@ -709,6 +709,66 @@ button {
   font-weight: 760;
 }
 
+.github-link-section {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.github-link-head,
+.github-link-editor,
+.github-link-actions,
+.github-candidates {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.github-link-head {
+  justify-content: space-between;
+}
+
+.github-link-head h3 {
+  margin: 0 0 3px;
+  font-size: 13px;
+}
+
+.github-link-head p,
+.form-note {
+  margin: 0;
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.github-link-editor input {
+  min-width: min(100%, 340px);
+  flex: 1 1 260px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #ffffff;
+  color: var(--text);
+  padding: 9px 10px;
+  font: inherit;
+}
+
+.github-candidates span {
+  color: var(--faint);
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.github-candidates button {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-soft);
+  color: var(--muted);
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
 .scenario-section ul {
   display: grid;
   gap: 6px;
@@ -1078,6 +1138,12 @@ button {
   padding: 7px 9px;
   font-size: 12px;
   white-space: nowrap;
+}
+
+.secondary-action.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #ffffff;
 }
 
 .secondary-action.danger {

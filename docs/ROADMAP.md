@@ -49,6 +49,26 @@ Deferred:
 - Automatic port fallback.
 - Killing or replacing unknown processes on occupied ports.
 
+## v0.5 GitHub Link Detection
+
+Goal: make GitHub links reliable without making users understand scanner internals.
+
+Implemented:
+
+- Prefer user-saved GitHub links when a user manually connects a capability.
+- Detect GitHub repositories from git remotes, preferring `origin` before `upstream`.
+- Detect GitHub repositories from nearby `package.json` `repository` and `homepage` fields.
+- Use explicit `SKILL.md` or nearby README links only when the result is unambiguous.
+- Keep ambiguous README links as candidates instead of auto-binding the wrong repository.
+- Store local manual mappings in `data/github-links.json`.
+- Add API endpoints to save, remove, and inspect GitHub link candidates.
+
+Non-goals:
+
+- Automatic GitHub search binding.
+- GitHub OAuth.
+- Requiring a GitHub token for repository link detection.
+
 ## Non-goals For Now
 
 - Static HTML export as the primary app model.
