@@ -1,8 +1,9 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { GoogleGenAI } from "@google/genai";
 import { homedir } from "node:os";
-import { basename, dirname, join, normalize, parse, relative, sep } from "node:path";
+import { basename, dirname, join, normalize, parse as parsePath, relative, sep } from "node:path";
 import type { Capability, InventoryResponse, RiskBadge } from "../shared/schema";
+import { parseMcpServerSections, parseSkillFrontmatter } from "./parsers";
 import { readTranslationSettings } from "./settings";
 
 const codexHome = normalize(process.env.CODEX_HOME || join(homedir(), ".codex"));
@@ -102,7 +103,7 @@ async function findFiles(root: string, targetName: string): Promise<string[]> {
 
 async function skillCapability(file: string): Promise<Capability> {
   const content = await readHead(file);
-  const frontmatter = parseFrontmatter(content);
+  const frontmatter = parseSkillFrontmatter(content);
   const title = firstMarkdownTitle(content);
   const inferred = basename(dirname(file));
   const sourceInfo = sourceFromSkillPath(file);
@@ -197,7 +198,7 @@ async function pluginCapabilities(root: string): Promise<Capability[]> {
 
 async function mcpCapabilities(file: string): Promise<Capability[]> {
   const text = await readFile(file, "utf8");
-  const sections = parseMcpSections(text);
+  const sections = parseMcpServerSections(text);
   return sections.map((section) => {
     const command = section.values.command;
     const url = section.values.url;
@@ -261,111 +262,6 @@ async function mcpCapabilities(file: string): Promise<Capability[]> {
       }
     } satisfies Capability;
   });
-}
-
-function parseMcpSections(text: string) {
-  const lines = text.split(/\r?\n/);
-  const sections: Array<{ name: string; values: Record<string, string>; envKeys: string[] }> = [];
-  let current: { name: string; values: Record<string, string>; envKeys: string[] } | null = null;
-
-  for (const line of lines) {
-    const section = line.match(/^\[mcp_servers\.("?)([^"\]]+)\1\]$/);
-    const envSection = line.match(/^\[mcp_servers\.("?)([^"\]]+)\1\.env\]$/);
-    const anySection = line.match(/^\[/);
-
-    if (section) {
-      current = { name: section[2], values: {}, envKeys: [] };
-      sections.push(current);
-      continue;
-    }
-    if (envSection) {
-      current = sections.find((item) => item.name === envSection[2]) ?? null;
-      continue;
-    }
-    if (anySection && !section && !envSection) {
-      current = null;
-      continue;
-    }
-    if (!current) continue;
-
-    const pair = line.match(/^\s*([A-Za-z0-9_]+)\s*=\s*(.+?)\s*$/);
-    if (!pair) continue;
-
-    const key = pair[1];
-    const value = pair[2].trim();
-    if (key === "env") current.envKeys.push(...inlineEnvKeys(value));
-    else if (["command", "url", "args", "bearer_token_env_var"].includes(key)) current.values[key] = sanitizeTomlValue(value);
-    else if (!["command", "url", "args", "bearer_token_env_var"].includes(key)) current.envKeys.push(key);
-    if (key === "bearer_token_env_var") current.envKeys.push(sanitizeTomlValue(value));
-  }
-
-  return sections;
-}
-
-function inlineEnvKeys(value: string) {
-  return Array.from(value.matchAll(/([A-Za-z_][A-Za-z0-9_]*)\s*=/g)).map((match) => match[1]);
-}
-
-function sanitizeTomlValue(value: string) {
-  return value.replace(/^['"]|['"]$/g, "");
-}
-
-function parseFrontmatter(content: string) {
-  const out = { name: "", summary: "", description: "", tags: [] as string[] };
-  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  if (!match) return out;
-
-  const lines = match[1].split(/\r?\n/);
-  let inTags = false;
-  let blockKey: "summary" | "description" | "" = "";
-  let blockLines: string[] = [];
-
-  const flushBlock = () => {
-    if (!blockKey) return;
-    const value = blockLines
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .join(" ")
-      .trim();
-    if (blockKey === "summary") out.summary = value;
-    if (blockKey === "description") out.description = value;
-    blockKey = "";
-    blockLines = [];
-  };
-
-  for (const line of lines) {
-    if (blockKey) {
-      if (/^\s+/.test(line) || !line.trim()) {
-        blockLines.push(line);
-        continue;
-      }
-      flushBlock();
-    }
-
-    const pair = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
-    if (pair) {
-      const key = pair[1];
-      const rawValue = pair[2].trim();
-      inTags = key === "tags";
-      if ((key === "summary" || key === "description") && /^[>|][+-]?$/.test(rawValue)) {
-        blockKey = key;
-        blockLines = [];
-        continue;
-      }
-      if (key === "name") out.name = cleanYaml(pair[2]);
-      if (key === "summary") out.summary = cleanYaml(pair[2]);
-      if (key === "description") out.description = cleanYaml(pair[2]);
-      if (key === "tags" && pair[2].startsWith("[")) out.tags = pair[2].replace(/[[\]]/g, "").split(",").map(cleanYaml).filter(Boolean);
-      continue;
-    }
-    if (inTags) {
-      const item = line.match(/^\s*-\s*(.+)$/);
-      if (item) out.tags.push(cleanYaml(item[1]));
-    }
-  }
-  flushBlock();
-
-  return out;
 }
 
 function firstMarkdownTitle(content: string) {
@@ -890,7 +786,7 @@ async function githubUrlFromNearbyReadme(path: string) {
 function ancestorDirs(path: string) {
   const start = path.endsWith(sep) ? path : path.toLowerCase().endsWith(`${sep}skill.md`) ? dirname(path) : path;
   const dirs: string[] = [];
-  const root = parse(start).root;
+  const root = parsePath(start).root;
   let current = normalize(start);
   for (let depth = 0; depth < 10 && current && current !== root; depth += 1) {
     dirs.push(current);
@@ -1049,10 +945,6 @@ function kebab(value: string) {
     .replace(/[^A-Za-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .toLowerCase();
-}
-
-function cleanYaml(value: string) {
-  return value.trim().replace(/^['"]|['"]$/g, "");
 }
 
 function prettyPluginName(value: string) {

@@ -851,7 +851,7 @@ function DashboardOverview({
       <section className={`scan-section api-settings-section ${apiPanelOpen ? "open" : ""}`}>
         <button className="api-summary-button" onClick={() => onApiPanelOpenChange(!apiPanelOpen)} type="button">
           <div>
-            <h3>{zh ? "\u7ffb\u8b6f API \u63a5\u53e3" : "Translation API"}</h3>
+            <h3>{zh ? "\u7ffb\u8b6f API\uff08\u9078\u7528\uff09" : "Translation API (optional)"}</h3>
             <p>
               {translationEstimate.pendingCount} / {translationEstimate.skillCount} {zh ? "\u5f85\u7ffb\u8b6f" : "pending"} ·{" "}
               {translationEstimate.estimatedCostUsd === null ? "-" : `$${translationEstimate.estimatedCostUsd.toFixed(4)}`}
@@ -932,6 +932,11 @@ function DashboardOverview({
                 <strong>{translationEstimate.estimatedCostUsd === null ? "-" : `$${translationEstimate.estimatedCostUsd.toFixed(4)}`}</strong>
               </div>
             </div>
+            <p>
+              {zh
+                ? "\u82f1\u6587\u539f\u6587\u63cf\u8ff0\u4e0d\u9700\u8981 API\uff1bAPI \u53ea\u7528\u65bc\u7e41\u9ad4\u4e2d\u6587\u7ffb\u8b6f\u8207\u5feb\u53d6\u3002"
+                : "Original English descriptions do not require an API. API access is only used for Traditional Chinese translation and caching."}
+            </p>
             <p>
               {zh ? "\u76ee\u524d provider" : "Current provider"}: {providerLabel}
               {translationSettings?.model ? ` / ${translationSettings.model}` : ""}
