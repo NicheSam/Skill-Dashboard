@@ -7,8 +7,10 @@ import { spawn } from "node:child_process";
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(scriptDir, "..");
 const appUrl = "http://localhost:8765";
-const healthUrl = "http://127.0.0.1:8766/api/health";
 const frontendUrl = "http://127.0.0.1:8765";
+const healthUrl = "http://127.0.0.1:8766/api/health";
+const logDir = resolve(projectRoot, ".logs");
+const statePath = resolve(logDir, "launcher-state.json");
 
 function npmCommand(args, options = {}) {
   const command = process.platform === "win32" ? "cmd.exe" : "npm";
@@ -36,24 +38,54 @@ function runNpm(args) {
   });
 }
 
-async function isReachable(url) {
+async function probeApi() {
   try {
-    const response = await fetch(url, { method: "GET" });
-    return response.ok;
-  } catch {
-    return false;
+    const response = await fetch(healthUrl, { method: "GET" });
+    const body = await response.json().catch(() => ({}));
+    return {
+      reachable: response.ok,
+      owned: response.ok && body?.service === "skill-dashboard-api",
+      detail: response.ok ? "healthy" : `HTTP ${response.status}`
+    };
+  } catch (error) {
+    return { reachable: false, owned: false, detail: errorMessage(error) };
   }
 }
 
-async function waitFor(url, label, timeoutMs = 30000) {
+async function probeFrontend() {
+  try {
+    const response = await fetch(frontendUrl, { method: "GET" });
+    const text = await response.text().catch(() => "");
+    return {
+      reachable: response.ok,
+      owned: response.ok && text.includes("<title>Skill-Dashboard</title>"),
+      detail: response.ok ? "healthy" : `HTTP ${response.status}`
+    };
+  } catch (error) {
+    return { reachable: false, owned: false, detail: errorMessage(error) };
+  }
+}
+
+async function waitForReady(timeoutMs = 30000) {
   const startedAt = Date.now();
+  let lastApi = null;
+  let lastFrontend = null;
 
   while (Date.now() - startedAt < timeoutMs) {
-    if (await isReachable(url)) return true;
-    await new Promise((resolvePromise) => setTimeout(resolvePromise, 750));
+    lastApi = await probeApi();
+    lastFrontend = await probeFrontend();
+    if (lastApi.owned && lastFrontend.owned) return;
+    await delay(750);
   }
 
-  throw new Error(`${label} did not become reachable at ${url}`);
+  throw new Error(
+    [
+      "Skill-Dashboard did not become ready before timeout.",
+      `API: ${formatProbe(lastApi)}`,
+      `Frontend: ${formatProbe(lastFrontend)}`,
+      `Inspect logs: ${resolve(logDir, "server.err.log")} and ${resolve(logDir, "client.err.log")}`
+    ].join("\n")
+  );
 }
 
 async function assertProjectRoot() {
@@ -66,6 +98,29 @@ async function assertProjectRoot() {
   }
 }
 
+async function classifyStartup() {
+  const [api, frontend, state] = await Promise.all([probeApi(), probeFrontend(), readState()]);
+  const serverPid = state?.processes?.server?.pid;
+  const clientPid = state?.processes?.client?.pid;
+
+  if (api.reachable && !api.owned) {
+    throw new Error(portConflictMessage("API", "8766", api, resolve(logDir, "server.err.log")));
+  }
+  if (frontend.reachable && !frontend.owned) {
+    throw new Error(portConflictMessage("frontend", "8765", frontend, resolve(logDir, "client.err.log")));
+  }
+
+  const missing = [];
+  if (!api.owned) missing.push("server");
+  if (!frontend.owned) missing.push("client");
+
+  const stale = [];
+  if (serverPid && !isProcessAlive(serverPid) && !api.owned) stale.push(`server pid ${serverPid}`);
+  if (clientPid && !isProcessAlive(clientPid) && !frontend.owned) stale.push(`client pid ${clientPid}`);
+
+  return { api, frontend, missing, stale };
+}
+
 async function main() {
   await assertProjectRoot();
 
@@ -74,18 +129,62 @@ async function main() {
     await runNpm(["install"]);
   }
 
-  const backendReady = await isReachable(healthUrl);
-  const frontendReady = await isReachable(frontendUrl);
+  const startup = await classifyStartup();
 
-  if (!backendReady || !frontendReady) {
-    console.log("Skill-Dashboard is not fully reachable; starting background dev server");
-    await runNpm(["run", "dev:background"]);
+  if (startup.missing.length === 0) {
+    console.log(`Skill-Dashboard is already ready: ${appUrl}`);
+    return;
   }
 
-  await waitFor(healthUrl, "API server");
-  await waitFor(frontendUrl, "Frontend");
+  if (startup.stale.length) {
+    console.log(`Detected stale launcher state: ${startup.stale.join(", ")}`);
+  }
+
+  console.log(`Starting missing service(s): ${startup.missing.join(", ")}`);
+  await runNpm(["run", "dev:background", "--", ...startup.missing]);
+  await waitForReady();
 
   console.log(`Skill-Dashboard is ready: ${appUrl}`);
+}
+
+function isProcessAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function readState() {
+  try {
+    return JSON.parse(await readFile(statePath, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+function portConflictMessage(label, port, probe, logPath) {
+  return [
+    `Port ${port} is reachable, but it does not look like the Skill-Dashboard ${label}.`,
+    `Probe result: ${formatProbe(probe)}`,
+    "Stop the process using that port, then run npm run launch again.",
+    `If this came from Skill-Dashboard, inspect: ${logPath}`
+  ].join("\n");
+}
+
+function formatProbe(probe) {
+  if (!probe) return "not checked";
+  return `${probe.reachable ? "reachable" : "unreachable"}, ${probe.owned ? "owned" : "not owned"}, ${probe.detail}`;
+}
+
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function delay(ms) {
+  return new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
 }
 
 main().catch((error) => {

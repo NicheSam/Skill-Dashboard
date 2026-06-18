@@ -30,18 +30,24 @@ Scope:
 - Preserve support for MCP env key detection without reading secret values.
 - Keep GitHub link detection heuristic for now, but isolate future improvements.
 
-## v0.4 Launcher Stability Plan
+## v0.4 Launcher Stability
 
-Goal: make `$skill-dashboard-launcher` more reliable without changing it during v0.2/v0.3 work.
+Goal: make `$skill-dashboard-launcher` more reliable without changing Codex Desktop pane behavior.
 
-Planned, not implemented yet:
+Implemented:
 
-- Replace ad hoc background process behavior with explicit process ownership.
-- Detect stale or half-running frontend/API processes before launch.
-- Handle occupied ports with clear remediation or fallback.
-- Improve health checks so `ready` is printed only after both services remain reachable.
-- Make installed launcher config repairable when the project folder moves.
-- Document Codex Desktop pane limitations without implying the launcher controls layout.
+- Record launcher-owned server and client pids in `.logs/launcher-state.json`.
+- Detect stale pid state before launch.
+- Detect half-running states and start only the missing server or client.
+- Detect occupied ports that do not look like Skill-Dashboard.
+- Print `ready` only after both the API health endpoint and frontend title check pass.
+- Keep Codex Desktop pane placement documented as a user-controlled UI behavior.
+
+Deferred:
+
+- Automatic project-path repair when the installed skill config points to a moved folder.
+- Automatic port fallback.
+- Killing or replacing unknown processes on occupied ports.
 
 ## Non-goals For Now
 

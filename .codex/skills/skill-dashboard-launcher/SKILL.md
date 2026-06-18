@@ -33,6 +33,9 @@ Skill-Dashboard is ready: http://localhost:8765
 ## Rules
 
 - Use `npm run launch` for normal startup. It checks dependencies, starts the dev server in the background when needed, and waits for both the frontend and API server.
+- Treat `Skill-Dashboard is already ready: http://localhost:8765` as a successful launch.
 - Do not use interactive `npm run dev` when the goal is to open the dashboard and continue the conversation.
-- If `npm run launch` fails, inspect `.logs/server.err.log` and `.logs/client.err.log` in the project root before guessing.
+- If `npm run launch` reports stale launcher state, continue after the command completes; it will restart missing services.
+- If `npm run launch` reports a port conflict, do not kill unknown processes automatically. Tell the user which port is occupied and inspect `.logs/server.err.log` or `.logs/client.err.log` only if the message suggests it may be from Skill-Dashboard.
+- If `npm run launch` times out, inspect `.logs/launcher-state.json`, `.logs/server.err.log`, and `.logs/client.err.log` in the project root before guessing.
 - Do not claim the skill controls Codex Desktop's pane layout. It opens the local dashboard URL; docking and pane placement are controlled by Codex Desktop.
