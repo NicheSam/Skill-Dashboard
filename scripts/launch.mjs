@@ -83,7 +83,7 @@ async function waitForReady(timeoutMs = 30000) {
       "Skill-Dashboard did not become ready before timeout.",
       `API: ${formatProbe(lastApi)}`,
       `Frontend: ${formatProbe(lastFrontend)}`,
-      `Inspect logs: ${resolve(logDir, "server.err.log")} and ${resolve(logDir, "client.err.log")}`
+      `Inspect logs if present: ${resolve(logDir, "server.err.log")} and ${resolve(logDir, "client.err.log")}`
     ].join("\n")
   );
 }
