@@ -1,4 +1,4 @@
-import { openSync } from "node:fs";
+import { openSync, writeFileSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { execFileSync, spawn } from "node:child_process";
@@ -61,8 +61,10 @@ function run(label, args) {
 function startWindowsProcess(args, outPath, errPath) {
   void outPath;
   void errPath;
-  const command = `/k cd /d "${projectRoot}" && npm.cmd ${args.join(" ")}`;
-  const script = `Start-Process -FilePath 'cmd.exe' -ArgumentList '${escapePowerShell(command)}' -WindowStyle Hidden -PassThru | Select-Object -ExpandProperty Id`;
+  const service = args[1] ?? "service";
+  const scriptPath = resolve(logDir, `run-${service}.cmd`);
+  writeFileSync(scriptPath, `@echo off\r\ncd /d "${projectRoot}"\r\nnpm.cmd ${args.join(" ")}\r\n`, "utf8");
+  const script = `Start-Process -FilePath 'cmd.exe' -ArgumentList '/k "${escapePowerShell(scriptPath)}"' -WindowStyle Hidden -PassThru | Select-Object -ExpandProperty Id`;
   const output = execFileSync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script], {
     cwd: projectRoot,
     encoding: "utf8"
